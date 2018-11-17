@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 import pandas as pd
-from IPython import display
+from sklearn.utils import shuffle
 from keras import Input, Sequential
 from keras.losses import mean_squared_error
 from keras.optimizers import Adam, RMSprop
@@ -137,12 +137,12 @@ GAN.compile(loss='categorical_crossentropy', optimizer=opt)
 GAN.summary()
 
 
-def plot_loss(losses):
+def plot_loss(losses, epoch):
         plt.figure(figsize=(10,8))
         plt.plot(losses["d"], label='discriminitive loss')
         plt.plot(losses["g"], label='generative loss')
         plt.legend()
-        plt.show()
+        plt.savefig('long_' + str(epoch) + ".png")
 
 # Pre-train the discriminator network ...
 
@@ -167,42 +167,43 @@ acc = n_rig*100.0/n_tot
 print ("Accuracy: %0.02f pct (%d of %d) right"%(acc, n_rig, n_tot))
 
 # set up loss storage vector
-losses = {"d":[], "g":[]}
+losses = {"d": [], "g": []}
 
 
 def train_for_n(nb_epoch=25, plt_frq=5, BATCH_SIZE=5):
     for e in tqdm(range(nb_epoch)):
 
         # Make generative images
-        randInt = np.random.randint(0, train_y.shape[0], size=BATCH_SIZE)
-        image_batch = train_y[randInt, :, :, :]
-        input_images = train_x[randInt, :, :, :]
-        generated_images = gen.predict(input_images)
+        random_samples = np.random.randint(0, train_y.shape[0], size=BATCH_SIZE)
+        real_image_inBatch = train_y[random_samples, :, :, :]
+        semantic_images_inBatch = train_x[random_samples, :, :, :]
+        generated_images = gen.predict(semantic_images_inBatch)
 
         # Train discriminator on generated images
-        X = np.concatenate((image_batch, generated_images))
+        x = np.concatenate((real_image_inBatch, generated_images))
         y = np.zeros([2 * BATCH_SIZE, 2])
         y[0:BATCH_SIZE, 1] = 1
         y[BATCH_SIZE:, 0] = 1
 
-        make_trainable(discr,True)
-        d_loss = discr.train_on_batch(X, y)
+        x, y = shuffle(x, y)
+        make_trainable(discr, True)
+        d_loss = discr.train_on_batch(x, y)
         losses["d"].append(d_loss)
 
-        # train Generator-Discriminator stack on input noise to non-generated output class
-        randInt = np.random.randint(0, train_y.shape[0], size=BATCH_SIZE)
-        input_images = train_x[randInt, :, :, :]
+        # train Generator-Discriminator stack on semantic images to non-generated output class
+        random_samples = np.random.randint(0, train_x.shape[0], size=BATCH_SIZE)
+        semantic_images_inBatch = train_x[random_samples, :, :, :]
         y2 = np.zeros([BATCH_SIZE, 2])
         y2[:, 1] = 1
 
-        make_trainable(discr,False)
-        g_loss = GAN.train_on_batch(input_images, y2)
+        make_trainable(discr, False)
+        g_loss = GAN.train_on_batch(semantic_images_inBatch, y2)
         losses["g"].append(g_loss)
-        print("d_loss: " + str(d_loss) + "g_loss: " + str(g_loss))
+        print("d_loss: " + str(d_loss) + "  g_loss: " + str(g_loss))
         # Updates plots
         if e % plt_frq == plt_frq - 1:
-            plot_loss(losses)
-            imsave("fake"+str(e) + ".png", generated_images[9])
+            plot_loss(losses, e)
+            imsave("new_"+str(e) + ".png", generated_images[9])
 
 
-train_for_n(nb_epoch=50, plt_frq=10,BATCH_SIZE=10)
+train_for_n(nb_epoch=500, plt_frq=10, BATCH_SIZE=10)
