@@ -3,21 +3,19 @@ import random
 import numpy as np
 import pandas as pd
 from sklearn.utils import shuffle
-from keras import Input, Sequential
-from keras.losses import mean_squared_error
-from keras.optimizers import Adam, RMSprop
+from keras import Input
+from keras.optimizers import Adam
 from skimage.io import imread, imsave
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 import config as cfg
 from keras.models import Model, load_model
-from keras.layers import BatchNormalization, Activation, Dense, Flatten
+from keras.layers import BatchNormalization, Activation, Dense, Flatten, regularizers
 from keras.layers.core import Dropout
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import concatenate
-from keras.callbacks import EarlyStopping, ModelCheckpoint, Callback, ReduceLROnPlateau
 
 
 def make_trainable(net, val):
@@ -55,16 +53,16 @@ opt = Adam(lr=1e-4)
 dopt = Adam(lr=1e-3)
 
 
-def conv2d_block(input_tensor, n_filters=4, kernel_size=3, batchnorm=True):
+def conv2d_block(input_tensor, n_filters=4, kernel_size=3, batchnorm=True, lamda_l1 = 0.001):
     # first layer
     x = Conv2D(filters=n_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer="random_normal",
-               padding="same")(input_tensor)
+               padding="same", kernel_regularizer=regularizers.l1(lamda_l1))(input_tensor)
     if batchnorm:
         x = BatchNormalization()(x)
     x = Activation("relu")(x)
     # second layer
     x = Conv2D(filters=n_filters, kernel_size=(kernel_size, kernel_size), kernel_initializer="random_normal",
-               padding="same")(x)
+               padding="same", kernel_regularizer=regularizers.l1(lamda_l1))(x)
     if batchnorm:
         x = BatchNormalization()(x)
     x = Activation("relu")(x)
@@ -137,12 +135,12 @@ GAN.compile(loss='categorical_crossentropy', optimizer=opt)
 GAN.summary()
 
 
-def plot_loss(losses, epoch):
+def plot_loss(losses):
         plt.figure(figsize=(10,8))
         plt.plot(losses["d"], label='discriminitive loss')
         plt.plot(losses["g"], label='generative loss')
         plt.legend()
-        plt.savefig('long_' + str(epoch) + ".png")
+        plt.savefig('11-20-18:30' + ".png")
 
 # Pre-train the discriminator network ...
 
@@ -202,8 +200,12 @@ def train_for_n(nb_epoch=25, plt_frq=5, BATCH_SIZE=5):
         print("d_loss: " + str(d_loss) + "  g_loss: " + str(g_loss))
         # Updates plots
         if e % plt_frq == plt_frq - 1:
-            plot_loss(losses, e)
-            imsave("new_"+str(e) + ".png", generated_images[9])
+
+            for i in range (0, len(generated_images)):
+                imsave("11-20-18:30"+str(e)+ "_"+ str(i) + ".png", generated_images[i])
+    plot_loss(losses)
+    #GAN.save(filepath='model.hdf5')
+    GAN.save_weights(filepath='weights.hdf5')
 
 
-train_for_n(nb_epoch=500, plt_frq=10, BATCH_SIZE=10)
+train_for_n(nb_epoch=300, plt_frq=100, BATCH_SIZE=10)
